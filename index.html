@@ -1,579 +1,743 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猫の体調管理ログ</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .toast { transition: transform .3s ease, opacity .3s ease; }
-        .toast.hidden-toast { transform: translateY(20px); opacity: 0; pointer-events: none; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .modal-bg { transition: opacity .2s ease; }
-    </style>
-</head>
-<body class="bg-gray-50 text-gray-800 pb-24">
-    <div class="max-w-md mx-auto p-4 space-y-5">
-        <header class="text-center pt-4">
-            <h1 class="text-2xl font-bold text-indigo-600">🐾 にゃんこログ</h1>
-            <p class="text-xs text-gray-500 mt-1">家族みんなの健康管理</p>
-        </header>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>にゃんこログ | 猫の体調管理</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F6F3EA;
+    --paper-raised:#FFFFFF;
+    --ink:#2E2A24;
+    --ink-soft:#8A8072;
+    --ink-faint:#DCD5C6;
+    --c-food:#A9762E;     --c-food-bg:#F1E3C6;
+    --c-toilet:#4C6E8C;   --c-toilet-bg:#DEE7EE;
+    --c-health:#A24F4B;   --c-health-bg:#F1DAD6;
+    --success:#3F7A5C;    --success-bg:#DCEAE1;
+    --error:#A8433A;      --error-bg:#F5DEDA;
+  }
+  *{-webkit-tap-highlight-color:transparent;}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:'Noto Sans JP',-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN',sans-serif;
+  }
+  .font-display{ font-family:'Zen Maru Gothic','Noto Sans JP',sans-serif; }
 
-        <!-- タブ切り替え -->
-        <div class="grid grid-cols-3 gap-1 bg-gray-100 p-1 rounded-xl text-sm font-bold">
-            <button data-tab="input"    class="tab-btn py-2 rounded-lg">✏️ 入力</button>
-            <button data-tab="calendar" class="tab-btn py-2 rounded-lg">📅 カレンダー</button>
-            <button data-tab="list"     class="tab-btn py-2 rounded-lg">📋 リスト</button>
+  :focus-visible{ outline:2px solid var(--ink); outline-offset:2px; border-radius:6px; }
+
+  .card{ background:var(--paper-raised); border-radius:22px; box-shadow:0 1px 2px rgba(46,42,36,.05), 0 6px 16px rgba(46,42,36,.06); }
+
+  .stamp-btn{ background:var(--ink); color:var(--paper); }
+  .stamp-btn:disabled{ background:var(--ink-faint); color:#fff; }
+  .press{ transition:transform .12s ease, opacity .12s ease; }
+  .press:active{ transform:scale(.96); opacity:.9; }
+
+  .cat-food{ color:var(--c-food); background:var(--c-food-bg); }
+  .cat-toilet{ color:var(--c-toilet); background:var(--c-toilet-bg); }
+  .cat-health{ color:var(--c-health); background:var(--c-health-bg); }
+  .dot-food{ background:var(--c-food); } .dot-toilet{ background:var(--c-toilet); } .dot-health{ background:var(--c-health); } .dot-photo{ background:var(--ink-soft); }
+  .border-food{ border-color:var(--c-food); } .border-toilet{ border-color:var(--c-toilet); } .border-health{ border-color:var(--c-health); }
+  .rowbar-food{ background:var(--c-food); } .rowbar-toilet{ background:var(--c-toilet); } .rowbar-health{ background:var(--c-health); }
+
+  .toast{ transition:transform .25s ease, opacity .25s ease; }
+  .toast.hidden-toast{ transform:translate(-50%,16px); opacity:0; pointer-events:none; }
+
+  .modal-bg{ transition:opacity .18s ease; }
+  .modal-card{ transition:transform .18s ease, opacity .18s ease; }
+
+  .no-scrollbar::-webkit-scrollbar{ display:none; }
+  .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
+
+  .skeleton{ position:relative; overflow:hidden; background:#EEE9DC; }
+  .skeleton::after{
+    content:''; position:absolute; inset:0; transform:translateX(-100%);
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
+    animation:shimmer 1.4s infinite;
+  }
+  @keyframes shimmer{ 100%{ transform:translateX(100%); } }
+
+  #bottom-nav{ padding-bottom:env(safe-area-inset-bottom); }
+
+  @media (prefers-reduced-motion: reduce){
+    .press, .toast, .modal-bg, .modal-card{ transition:none !important; }
+    .skeleton::after{ animation:none !important; }
+  }
+</style>
+</head>
+<body class="pb-28">
+  <div class="max-w-md mx-auto px-4 pt-6 space-y-5">
+
+    <!-- ヘッダー -->
+    <header class="flex items-center gap-2.5 px-1">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 14c-3 0-5.5 2-5.5 4.5S8.5 21 12 21s5.5-1 5.5-2.5S15 14 12 14Z" fill="var(--ink)"/>
+        <circle cx="5.5" cy="7" r="2.3" fill="var(--ink)"/>
+        <circle cx="10" cy="4.2" r="2.3" fill="var(--ink)"/>
+        <circle cx="14" cy="4.2" r="2.3" fill="var(--ink)"/>
+        <circle cx="18.5" cy="7" r="2.3" fill="var(--ink)"/>
+      </svg>
+      <div>
+        <h1 class="font-display font-bold text-xl leading-tight" style="color:var(--ink)">にゃんこログ</h1>
+        <p class="text-xs" style="color:var(--ink-soft)">家族みんなの健康記録</p>
+      </div>
+    </header>
+
+    <!-- ===== 入力タブ ===== -->
+    <section id="tab-input" class="space-y-5">
+      <!-- 本日のサマリー -->
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-display font-bold text-sm">今日のようす</h2>
+          <span id="today-date" class="text-xs" style="color:var(--ink-soft)"></span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div class="cat-food rounded-2xl py-2.5">
+            <p class="text-[10px] font-bold opacity-80">🍚 ごはん</p>
+            <p id="sum-food" class="font-display text-xl font-bold">0</p>
+          </div>
+          <div class="cat-toilet rounded-2xl py-2.5">
+            <p class="text-[10px] font-bold opacity-80">🚽 トイレ</p>
+            <p id="sum-toilet" class="font-display text-xl font-bold">0</p>
+          </div>
+          <div class="cat-health rounded-2xl py-2.5">
+            <p class="text-[10px] font-bold opacity-80">🩺 体調・他</p>
+            <p id="sum-other" class="font-display text-xl font-bold">0</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 記録フォーム -->
+      <div class="card p-5 space-y-4" style="border-top:3px dashed var(--ink-faint)">
+        <h2 class="font-display font-bold text-sm">いまの記録を追加</h2>
+
+        <details class="rounded-2xl p-3" style="background:var(--paper)">
+          <summary class="text-xs font-bold cursor-pointer flex items-center justify-between list-none" style="color:var(--ink-soft)">
+            <span>🔑 接続設定（GitHubトークン）</span>
+            <span id="token-status" class="text-[10px] px-2 py-0.5 rounded-full font-bold" style="background:var(--ink-faint);color:var(--ink-soft)">未設定</span>
+          </summary>
+          <div class="mt-3 space-y-2">
+            <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off"
+              class="w-full p-3 text-sm rounded-xl border-0" style="background:var(--paper-raised)">
+            <p class="text-[10px] leading-relaxed" style="color:var(--ink-soft)">
+              ⚠️ トークンはこの端末のブラウザにのみ保存され、サーバーには送信されません。共有端末では入力後に必ず削除してください。
+            </p>
+            <button type="button" id="token-clear" class="press text-[11px] font-bold" style="color:var(--error)">トークンを削除する</button>
+          </div>
+        </details>
+
+        <div>
+          <label class="block text-xs font-bold mb-2" style="color:var(--ink-soft)">きろくの種類</label>
+          <div class="grid grid-cols-3 gap-2" id="type-buttons">
+            <button type="button" data-type="ごはん" class="type-btn press p-3 rounded-2xl font-bold text-sm border-2">🍚 ごはん</button>
+            <button type="button" data-type="トイレ" class="type-btn press p-3 rounded-2xl font-bold text-sm border-2">🚽 トイレ</button>
+            <button type="button" data-type="体調・他" class="type-btn press p-3 rounded-2xl font-bold text-sm border-2">🩺 体調・他</button>
+          </div>
         </div>
 
-        <!-- ===== 入力タブ ===== -->
-        <section id="tab-input" class="space-y-5">
-            <!-- 本日のサマリー -->
-            <div class="bg-white p-4 rounded-2xl shadow-sm">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="font-bold text-sm text-gray-700">今日のようす</h2>
-                    <span id="today-date" class="text-xs text-gray-400"></span>
-                </div>
-                <div class="grid grid-cols-3 gap-2 text-center">
-                    <div class="bg-orange-50 rounded-xl py-2">
-                        <p class="text-[10px] text-orange-600 font-medium">🍚 ごはん</p>
-                        <p id="sum-food" class="text-lg font-bold text-orange-700">0</p>
-                    </div>
-                    <div class="bg-blue-50 rounded-xl py-2">
-                        <p class="text-[10px] text-blue-600 font-medium">🚽 トイレ</p>
-                        <p id="sum-toilet" class="text-lg font-bold text-blue-700">0</p>
-                    </div>
-                    <div class="bg-purple-50 rounded-xl py-2">
-                        <p class="text-[10px] text-purple-600 font-medium">🩺 体調・他</p>
-                        <p id="sum-other" class="text-lg font-bold text-purple-700">0</p>
-                    </div>
-                </div>
-            </div>
+        <div>
+          <label for="datetime" class="block text-xs font-bold mb-1" style="color:var(--ink-soft)">日付・時刻</label>
+          <div class="flex gap-2">
+            <input type="datetime-local" id="datetime" class="flex-1 p-3 text-sm rounded-xl border-0" style="background:var(--paper)">
+            <button type="button" id="datetime-now" class="press px-3.5 rounded-xl text-xs font-bold border-2" style="border-color:var(--ink-faint);color:var(--ink-soft)">今</button>
+          </div>
+          <p class="text-[10px] mt-1" style="color:var(--ink-soft)">あとから過去の記録も追加できます</p>
+        </div>
 
-            <!-- 記録フォーム -->
-            <div class="bg-white p-5 rounded-2xl shadow-sm space-y-4">
-                <h2 class="font-bold text-sm text-gray-700">いまの記録を追加</h2>
+        <div>
+          <label for="memo" class="block text-xs font-bold mb-1" style="color:var(--ink-soft)">詳細メモ</label>
+          <input type="text" id="memo" placeholder="例: カリカリ30g完食 / うんち普通" class="w-full p-3 text-sm rounded-xl border-0" style="background:var(--paper)">
+          <div id="quick-memo" class="flex flex-wrap gap-1.5 mt-2"></div>
+        </div>
 
-                <details class="bg-gray-50 rounded-xl p-3">
-                    <summary class="text-xs font-medium text-gray-500 cursor-pointer flex items-center justify-between">
-                        <span>🔑 接続設定（GitHubトークン）</span>
-                        <span id="token-status" class="text-[10px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-500">未設定</span>
-                    </summary>
-                    <div class="mt-3">
-                        <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxx" class="w-full p-2.5 text-sm border rounded-xl bg-white">
-                        <p class="text-[10px] text-gray-400 mt-1">※初回のみ入力。この端末のブラウザに保存されます。</p>
-                    </div>
-                </details>
+        <div>
+          <label class="block text-xs font-bold mb-1" style="color:var(--ink-soft)">📷 写真（任意）</label>
+          <div id="photo-preview" class="hidden mb-2 relative w-24 h-24">
+            <img id="preview-img" class="w-24 h-24 object-cover rounded-xl" alt="選択した写真のプレビュー">
+            <button type="button" id="photo-clear" aria-label="写真を取り消す"
+              class="press absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold" style="background:var(--error)">✕</button>
+          </div>
+          <input type="file" id="photo" accept="image/*" class="w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold" style="color:var(--ink-soft)">
+          <p class="text-[10px] mt-1" style="color:var(--ink-soft)">アップロード時に自動で圧縮されます</p>
+        </div>
 
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">きろくの種類</label>
-                    <div class="grid grid-cols-3 gap-2" id="type-buttons">
-                        <button type="button" data-type="ごはん" class="type-btn p-3 rounded-xl font-bold text-sm">🍚 ごはん</button>
-                        <button type="button" data-type="トイレ" class="type-btn p-3 rounded-xl font-bold text-sm">🚽 トイレ</button>
-                        <button type="button" data-type="体調・他" class="type-btn p-3 rounded-xl font-bold text-sm">🩺 体調・他</button>
-                    </div>
-                </div>
+        <button id="save-btn" class="stamp-btn press w-full py-3.5 rounded-2xl font-display font-bold text-base">
+          記録を保存する
+        </button>
+      </div>
+    </section>
 
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">日付・時刻</label>
-                    <input type="datetime-local" id="datetime" class="w-full p-3 text-sm border rounded-xl">
-                    <p class="text-[10px] text-gray-400 mt-1">※あとから過去の記録も追加できます</p>
-                </div>
+    <!-- ===== カレンダータブ ===== -->
+    <section id="tab-calendar" class="hidden space-y-4">
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <button id="cal-prev" aria-label="前の月" class="press w-9 h-9 rounded-full flex items-center justify-center" style="background:var(--paper)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <span id="cal-title" class="font-display font-bold text-sm"></span>
+          <button id="cal-next" aria-label="次の月" class="press w-9 h-9 rounded-full flex items-center justify-center" style="background:var(--paper)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="grid grid-cols-7 text-center text-[10px] font-bold mb-1" style="color:var(--ink-soft)">
+          <div style="color:var(--error)">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div style="color:var(--c-toilet)">土</div>
+        </div>
+        <div id="calendar-grid" class="grid grid-cols-7 gap-1"></div>
+        <div class="flex flex-wrap gap-3 mt-3 pt-3 text-[10px] font-bold" style="border-top:1px solid var(--paper); color:var(--ink-soft)">
+          <span class="flex items-center gap-1"><i class="dot-food inline-block w-2 h-2 rounded-full"></i>ごはん</span>
+          <span class="flex items-center gap-1"><i class="dot-toilet inline-block w-2 h-2 rounded-full"></i>トイレ</span>
+          <span class="flex items-center gap-1"><i class="dot-health inline-block w-2 h-2 rounded-full"></i>体調・他</span>
+          <span class="flex items-center gap-1"><i class="dot-photo inline-block w-2 h-2 rounded-full"></i>写真あり</span>
+        </div>
+      </div>
+      <div id="day-detail" class="card p-5 hidden">
+        <h3 id="day-detail-title" class="font-display font-bold text-sm mb-3"></h3>
+        <div id="day-detail-list"></div>
+      </div>
+    </section>
 
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">詳細メモ</label>
-                    <input type="text" id="memo" placeholder="例: カリカリ30g完食 / うんち普通" class="w-full p-3 text-sm border rounded-xl">
-                    <div id="quick-memo" class="flex flex-wrap gap-2 mt-2"></div>
-                </div>
+    <!-- ===== リストタブ ===== -->
+    <section id="tab-list" class="hidden">
+      <div class="card p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="font-display font-bold text-sm">これまでの記録</h2>
+          <button id="refresh-btn" class="press text-xs font-bold" style="color:var(--ink-soft)">↻ 更新</button>
+        </div>
+        <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1" id="filter-buttons">
+          <button data-filter="all" class="filter-btn press whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold">すべて</button>
+          <button data-filter="ごはん" class="filter-btn press whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold">🍚 ごはん</button>
+          <button data-filter="トイレ" class="filter-btn press whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold">🚽 トイレ</button>
+          <button data-filter="体調・他" class="filter-btn press whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold">🩺 体調・他</button>
+        </div>
+        <div id="log-list" class="space-y-4"></div>
+      </div>
+    </section>
+  </div>
 
-                <!-- 写真添付 -->
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">📷 写真（任意）</label>
-                    <input type="file" id="photo" accept="image/*" class="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-600">
-                    <div id="photo-preview" class="mt-2 hidden">
-                        <img id="preview-img" class="w-24 h-24 object-cover rounded-xl border" alt="preview">
-                        <button type="button" id="photo-clear" class="text-[10px] text-red-400 mt-1">写真を取り消す</button>
-                    </div>
-                    <p class="text-[10px] text-gray-400 mt-1">※アップ時に自動で圧縮されます</p>
-                </div>
-
-                <button id="save-btn" class="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold shadow-md active:scale-95 transition-transform disabled:opacity-60">
-                    記録を保存する
-                </button>
-            </div>
-        </section>
-
-        <!-- ===== カレンダータブ ===== -->
-        <section id="tab-calendar" class="hidden space-y-4">
-            <div class="bg-white p-4 rounded-2xl shadow-sm">
-                <div class="flex items-center justify-between mb-3">
-                    <button id="cal-prev" class="px-3 py-1 rounded-lg bg-gray-100 text-gray-600 active:opacity-60">‹</button>
-                    <span id="cal-title" class="font-bold text-sm text-gray-700"></span>
-                    <button id="cal-next" class="px-3 py-1 rounded-lg bg-gray-100 text-gray-600 active:opacity-60">›</button>
-                </div>
-                <div class="grid grid-cols-7 text-center text-[10px] text-gray-400 mb-1">
-                    <div class="text-red-400">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-blue-400">土</div>
-                </div>
-                <div id="calendar-grid" class="grid grid-cols-7 gap-1"></div>
-                <div class="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-100 text-[10px] text-gray-500">
-                    <span>🍚 ごはん</span><span>🚽 トイレ</span><span>🩺 体調・他</span><span>📷 写真あり</span>
-                </div>
-            </div>
-            <!-- 選択日の詳細 -->
-            <div id="day-detail" class="bg-white p-5 rounded-2xl shadow-sm hidden">
-                <h3 id="day-detail-title" class="font-bold text-sm text-gray-700 mb-3"></h3>
-                <div id="day-detail-list" class="space-y-3"></div>
-            </div>
-        </section>
-
-        <!-- ===== リストタブ ===== -->
-        <section id="tab-list" class="hidden">
-            <div class="bg-white p-5 rounded-2xl shadow-sm space-y-3">
-                <div class="flex items-center justify-between">
-                    <h2 class="font-bold text-sm text-gray-700">これまでの記録</h2>
-                    <button id="refresh-btn" class="text-xs text-indigo-500 active:opacity-60">↻ 更新</button>
-                </div>
-                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1" id="filter-buttons">
-                    <button data-filter="all" class="filter-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold">すべて</button>
-                    <button data-filter="ごはん" class="filter-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold">🍚 ごはん</button>
-                    <button data-filter="トイレ" class="filter-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold">🚽 トイレ</button>
-                    <button data-filter="体調・他" class="filter-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold">🩺 体調・他</button>
-                </div>
-                <div id="log-list" class="space-y-4">
-                    <p class="text-xs text-gray-400 text-center py-4">読み込み中...</p>
-                </div>
-            </div>
-        </section>
+  <!-- 下部ナビ（片手操作しやすいように画面下に固定） -->
+  <nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 z-40" style="background:var(--paper-raised); box-shadow:0 -2px 10px rgba(46,42,36,.06)">
+    <div class="max-w-md mx-auto grid grid-cols-3 gap-1 p-2">
+      <button data-tab="input" class="nav-btn press flex flex-col items-center gap-0.5 py-2 rounded-2xl">
+        <span class="text-lg">✏️</span><span class="text-[10px] font-bold">入力</span>
+      </button>
+      <button data-tab="calendar" class="nav-btn press flex flex-col items-center gap-0.5 py-2 rounded-2xl">
+        <span class="text-lg">📅</span><span class="text-[10px] font-bold">カレンダー</span>
+      </button>
+      <button data-tab="list" class="nav-btn press flex flex-col items-center gap-0.5 py-2 rounded-2xl">
+        <span class="text-lg">📋</span><span class="text-[10px] font-bold">リスト</span>
+      </button>
     </div>
+  </nav>
 
-    <!-- 画像拡大モーダル -->
-    <div id="img-modal" class="modal-bg fixed inset-0 bg-black/80 z-50 hidden items-center justify-center p-4" onclick="closeImgModal()">
-        <img id="modal-img" class="max-w-full max-h-full rounded-xl" alt="拡大画像">
+  <!-- 画像拡大モーダル -->
+  <div id="img-modal" class="modal-bg fixed inset-0 bg-black/80 z-50 hidden items-center justify-center p-4">
+    <button id="img-modal-close" aria-label="閉じる" class="press absolute top-5 right-5 w-9 h-9 rounded-full bg-white/90 flex items-center justify-center font-bold">✕</button>
+    <img id="modal-img" class="max-w-full max-h-full rounded-xl" alt="拡大画像">
+  </div>
+
+  <!-- 確認モーダル（削除など） -->
+  <div id="confirm-modal" class="modal-bg fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-6">
+    <div class="modal-card card p-5 w-full max-w-xs space-y-4">
+      <p id="confirm-message" class="text-sm font-bold text-center leading-relaxed"></p>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="confirm-cancel" class="press py-2.5 rounded-xl text-sm font-bold border-2" style="border-color:var(--ink-faint);color:var(--ink-soft)">キャンセル</button>
+        <button id="confirm-ok" class="press py-2.5 rounded-xl text-sm font-bold text-white" style="background:var(--error)">削除する</button>
+      </div>
     </div>
+  </div>
 
-    <!-- トースト -->
-    <div id="toast" class="toast hidden-toast fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl text-sm text-white font-bold shadow-lg bg-gray-800">メッセージ</div>
+  <!-- トースト -->
+  <div id="toast" class="toast hidden-toast fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-full text-sm text-white font-bold shadow-lg" style="background:var(--ink)">メッセージ</div>
 
-    <script>
-        const REPO = "yoshikis0207-maker/cat-health-log";
-        // データの読み込みをGitHub Pagesの相対パスに変更（キャッシュ対策付き）
-        const DATA_URL  = `./data.json`;
-        const API_URL   = `https://api.github.com/repos/${REPO}/contents/data.json`;
-        const IMG_API   = `https://api.github.com/repos/${REPO}/contents/images`;
-        const IMG_RAW_DIR = `https://raw.githubusercontent.com/${REPO}/main/images`;
+  <script>
+    const REPO = "yoshikis0207-maker/cat-health-log";
+    const DATA_URL  = `./data.json`;
+    const API_URL   = `https://api.github.com/repos/${REPO}/contents/data.json`;
+    const IMG_API   = `https://api.github.com/repos/${REPO}/contents/images`;
+    const IMG_RAW_DIR = `https://raw.githubusercontent.com/${REPO}/main/images`;
 
-        let selectedType = "ごはん";
-        let currentFilter = "all";
-        let allLogs = [];
-        let calDate = new Date();      
-        let selectedPhotoData = null;  
+    let selectedType = localStorage.getItem('last_type') || "ごはん";
+    let currentFilter = "all";
+    let allLogs = [];
+    let calDate = new Date();
+    let selectedPhotoData = null;
+    let isLoading = true;
+    let loadError = false;
 
-        const TYPE_STYLE = {
-            "ごはん":  { badge: "bg-orange-100 text-orange-700", icon: "🍚" },
-            "トイレ":  { badge: "bg-blue-100 text-blue-700",     icon: "🚽" },
-            "体調・他": { badge: "bg-purple-100 text-purple-700", icon: "🩺" },
+    const CAT = {
+      "ごはん":   { key:'food',   icon:'🍚' },
+      "トイレ":   { key:'toilet', icon:'🚽' },
+      "体調・他": { key:'health', icon:'🩺' },
+    };
+    const QUICK_MEMOS = {
+      "ごはん":   ["完食", "残した", "カリカリ", "ウェット", "おやつ"],
+      "トイレ":   ["おしっこ", "うんち普通", "うんち柔らかい", "便秘ぎみ", "血尿?"],
+      "体調・他": ["元気", "嘔吐", "元気ない", "通院", "投薬"],
+    };
+
+    // ===== トースト =====
+    let toastTimer;
+    function showToast(msg, type = "info") {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.background = type === "success" ? "var(--success)" : type === "error" ? "var(--error)" : "var(--ink)";
+      t.classList.remove('hidden-toast');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.add('hidden-toast'), 2800);
+    }
+
+    // ===== 確認モーダル =====
+    function askConfirm(message, okLabel = "削除する") {
+      return new Promise(resolve => {
+        const modal = document.getElementById('confirm-modal');
+        document.getElementById('confirm-message').textContent = message;
+        document.getElementById('confirm-ok').textContent = okLabel;
+        modal.classList.remove('hidden'); modal.classList.add('flex');
+        const okBtn = document.getElementById('confirm-ok');
+        const cancelBtn = document.getElementById('confirm-cancel');
+        const cleanup = (result) => {
+          modal.classList.add('hidden'); modal.classList.remove('flex');
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          resolve(result);
         };
-        const QUICK_MEMOS = {
-            "ごはん":  ["完食", "残した", "カリカリ", "ウェット", "おやつ"],
-            "トイレ":  ["おしっこ", "うんち普通", "うんち柔らかい", "便秘ぎみ", "血尿?"],
-            "体調・他": ["元気", "嘔吐", "元気ない", "通院", "投薬"],
+        const onOk = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+      });
+    }
+
+    // ===== タブ / 下部ナビ =====
+    function switchTab(tab) {
+      ['input','calendar','list'].forEach(t=>{
+        document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
+      });
+      document.querySelectorAll('.nav-btn').forEach(b=>{
+        const active = b.dataset.tab===tab;
+        b.style.background = active ? 'var(--ink)' : 'transparent';
+        b.style.color = active ? 'var(--paper)' : 'var(--ink-soft)';
+      });
+      if (tab==='calendar') renderCalendar();
+    }
+    document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
+
+    // ===== 種類ボタン =====
+    function renderTypeButtons() {
+      document.querySelectorAll('.type-btn').forEach(btn=>{
+        const active = btn.dataset.type===selectedType;
+        const key = CAT[btn.dataset.type].key;
+        btn.className = "type-btn press p-3 rounded-2xl font-bold text-sm border-2 " + (active ? `cat-${key} border-${key}` : "");
+        if(!active){ btn.style.background='var(--paper)'; btn.style.color='var(--ink-soft)'; btn.style.borderColor='transparent'; }
+        else { btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; }
+      });
+      renderQuickMemos();
+    }
+    document.querySelectorAll('.type-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{ selectedType=btn.dataset.type; localStorage.setItem('last_type', selectedType); renderTypeButtons(); });
+    });
+
+    // ===== クイックメモ =====
+    function renderQuickMemos() {
+      const wrap = document.getElementById('quick-memo');
+      const key = CAT[selectedType].key;
+      wrap.innerHTML = (QUICK_MEMOS[selectedType]||[]).map(m=>
+        `<button type="button" class="qmemo press cat-${key} px-3 py-1 rounded-full text-xs font-bold">+ ${m}</button>`
+      ).join('');
+      wrap.querySelectorAll('.qmemo').forEach(b=>{
+        b.addEventListener('click',()=>{
+          const input=document.getElementById('memo');
+          const text=b.textContent.replace('+ ','');
+          input.value = input.value?`${input.value} / ${text}`:text;
+        });
+      });
+    }
+
+    // ===== フィルター =====
+    function renderFilterButtons() {
+      document.querySelectorAll('.filter-btn').forEach(btn=>{
+        const active=btn.dataset.filter===currentFilter;
+        if(active){
+          const key = btn.dataset.filter==='all' ? null : CAT[btn.dataset.filter].key;
+          btn.className = "filter-btn press whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold " + (key?`cat-${key}`:"");
+          if(!key){ btn.style.background='var(--ink)'; btn.style.color='var(--paper)'; } else { btn.style.background=''; btn.style.color=''; }
+        } else {
+          btn.className = "filter-btn press whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold";
+          btn.style.background='var(--paper)'; btn.style.color='var(--ink-soft)';
+        }
+      });
+    }
+    document.querySelectorAll('.filter-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{ currentFilter=btn.dataset.filter; renderFilterButtons(); renderLogs(); });
+    });
+
+    // ===== トークン =====
+    const tokenInput=document.getElementById('token');
+    const savedToken=localStorage.getItem('github_token');
+    if(savedToken) tokenInput.value=savedToken;
+    function updateTokenStatus() {
+      const el=document.getElementById('token-status');
+      if(tokenInput.value.trim()){ el.textContent="設定済み"; el.style.background='var(--success-bg)'; el.style.color='var(--success)'; }
+      else { el.textContent="未設定"; el.style.background='var(--ink-faint)'; el.style.color='var(--ink-soft)'; }
+    }
+    tokenInput.addEventListener('input',e=>{ localStorage.setItem('github_token',e.target.value); updateTokenStatus(); });
+    document.getElementById('token-clear').addEventListener('click', ()=>{
+      tokenInput.value=''; localStorage.removeItem('github_token'); updateTokenStatus(); showToast('トークンを削除しました','success');
+    });
+
+    // ===== 写真：選択→圧縮 =====
+    document.getElementById('photo').addEventListener('change', async (e)=>{
+      const file=e.target.files[0];
+      if(!file) return;
+      try {
+        selectedPhotoData = await compressImage(file, 1000, 0.75);
+        document.getElementById('preview-img').src = selectedPhotoData;
+        document.getElementById('photo-preview').classList.remove('hidden');
+      } catch(err) {
+        showToast('画像の読み込みに失敗しました','error');
+      }
+    });
+    document.getElementById('photo-clear').addEventListener('click', clearPhoto);
+    function clearPhoto() {
+      selectedPhotoData=null;
+      document.getElementById('photo').value='';
+      document.getElementById('photo-preview').classList.add('hidden');
+    }
+    function compressImage(file, maxW, quality) {
+      return new Promise((resolve,reject)=>{
+        const reader=new FileReader();
+        reader.onload=()=>{
+          const img=new Image();
+          img.onload=()=>{
+            let {width,height}=img;
+            if(width>maxW){ height=Math.round(height*maxW/width); width=maxW; }
+            const canvas=document.createElement('canvas');
+            canvas.width=width; canvas.height=height;
+            canvas.getContext('2d').drawImage(img,0,0,width,height);
+            resolve(canvas.toDataURL('image/jpeg',quality));
+          };
+          img.onerror=reject;
+          img.src=reader.result;
         };
+        reader.onerror=reject;
+        reader.readAsDataURL(file);
+      });
+    }
 
-        // ===== トースト =====
-        let toastTimer;
-        function showToast(msg, type = "info") {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.classList.remove('bg-gray-800','bg-green-600','bg-red-500');
-            t.classList.add(type==="success"?"bg-green-600":type==="error"?"bg-red-500":"bg-gray-800");
-            t.classList.remove('hidden-toast');
-            clearTimeout(toastTimer);
-            toastTimer = setTimeout(()=>t.classList.add('hidden-toast'), 2800);
-        }
+    // ===== 日付ユーティリティ =====
+    function ymd(d){ const x=new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; }
+    function timeLabel(iso){ const d=new Date(iso); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+    function dayLabel(d){
+      const today=new Date(); today.setHours(0,0,0,0);
+      const t=new Date(d); t.setHours(0,0,0,0);
+      const diff=Math.round((today-t)/86400000);
+      if(diff===0) return "今日";
+      if(diff===1) return "昨日";
+      return `${t.getMonth()+1}月${t.getDate()}日`;
+    }
+    function toDatetimeLocal(d){
+      const p=n=>String(n).padStart(2,'0');
+      return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+    document.getElementById('datetime-now').addEventListener('click', ()=>{
+      document.getElementById('datetime').value = toDatetimeLocal(new Date());
+    });
 
-        // ===== タブ =====
-        function switchTab(tab) {
-            ['input','calendar','list'].forEach(t=>{
-                document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
-            });
-            document.querySelectorAll('.tab-btn').forEach(b=>{
-                const active = b.dataset.tab===tab;
-                b.className = "tab-btn py-2 rounded-lg " + (active?"bg-white text-indigo-600 shadow-sm":"text-gray-500");
-            });
-            if (tab==='calendar') renderCalendar();
-        }
-        document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
+    // ===== サマリー =====
+    function updateSummary() {
+      const today=ymd(new Date());
+      const counts={"ごはん":0,"トイレ":0,"体調・他":0};
+      allLogs.forEach(l=>{ if(ymd(l.ts||l.date)===today && counts[l.type]!==undefined) counts[l.type]++; });
+      document.getElementById('sum-food').textContent=counts["ごはん"];
+      document.getElementById('sum-toilet').textContent=counts["トイレ"];
+      document.getElementById('sum-other').textContent=counts["体調・他"];
+      const now=new Date();
+      document.getElementById('today-date').textContent=`${now.getMonth()+1}/${now.getDate()} (${'日月火水木金土'[now.getDay()]})`;
+    }
 
-        // ===== 種類ボタン =====
-        function renderTypeButtons() {
-            document.querySelectorAll('.type-btn').forEach(btn=>{
-                const active = btn.dataset.type===selectedType;
-                btn.className = "type-btn p-3 rounded-xl font-bold text-sm border-2 " +
-                    (active?"bg-indigo-50 text-indigo-700 border-indigo-500":"bg-gray-50 text-gray-600 border-transparent");
-            });
-            renderQuickMemos();
+    function escapeHtml(str){ return String(str).replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+    function photoUrl(log){ if(!log.photo) return null; return `${IMG_RAW_DIR}/${log.photo}`; }
+
+    // ===== リスト描画 =====
+    function renderLogs() {
+      const listEl=document.getElementById('log-list');
+      if(isLoading){ listEl.innerHTML = skeletonHtml(); return; }
+      if(loadError){
+        listEl.innerHTML = `
+          <div class="text-center py-8 space-y-3">
+            <p class="text-sm font-bold" style="color:var(--error)">記録の読み込みに失敗しました</p>
+            <p class="text-xs" style="color:var(--ink-soft)">通信環境を確認してもう一度お試しください</p>
+            <button id="retry-btn" class="press inline-block px-4 py-2 rounded-xl text-xs font-bold text-white" style="background:var(--ink)">再読み込み</button>
+          </div>`;
+        document.getElementById('retry-btn').addEventListener('click', fetchLogs);
+        return;
+      }
+      let logs=[...allLogs];
+      if(currentFilter!=="all") logs=logs.filter(l=>l.type===currentFilter);
+      logs.sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+      if(logs.length===0){
+        listEl.innerHTML = `
+          <div class="text-center py-10">
+            <p class="text-2xl mb-2">🐾</p>
+            <p class="text-sm font-bold">まだ記録がありません</p>
+            <p class="text-xs mt-1" style="color:var(--ink-soft)">「入力」タブから今日のようすを記録してみましょう</p>
+          </div>`;
+        return;
+      }
+      const groups={};
+      logs.forEach(l=>{ const key=l.ts?dayLabel(l.ts):(l.date||"日付不明"); (groups[key]=groups[key]||[]).push(l); });
+      listEl.innerHTML=Object.entries(groups).map(([label,items])=>`
+        <div>
+          <div class="py-1 mb-1"><span class="text-xs font-bold" style="color:var(--ink-soft)">${label}</span></div>
+          <div class="space-y-2">${items.map(log=>logRowHtml(log)).join('')}</div>
+        </div>`).join('');
+      bindRowButtons(listEl);
+    }
+
+    function skeletonHtml(){
+      return Array.from({length:3}).map(()=>`
+        <div class="flex gap-3 items-center">
+          <div class="skeleton w-14 h-14 rounded-xl shrink-0"></div>
+          <div class="flex-1 space-y-2">
+            <div class="skeleton h-3 w-20 rounded-full"></div>
+            <div class="skeleton h-3 w-40 rounded-full"></div>
+          </div>
+        </div>`).join('');
+    }
+
+    function logRowHtml(log){
+      const cat = CAT[log.type] || { key:'food', icon:'📝' };
+      const time=log.ts?timeLabel(log.ts):(log.date||"");
+      const url=photoUrl(log);
+      return `
+      <div class="flex gap-3 pl-3 py-2 rounded-r-xl" style="border-left:4px solid var(--c-${cat.key==='toilet'?'toilet':cat.key==='health'?'health':'food'})">
+        <div class="flex-1 min-w-0">
+          <span class="inline-block px-2 py-0.5 text-xs font-bold rounded-md cat-${cat.key}">${cat.icon} ${log.type}</span>
+          <p class="text-sm mt-1.5 break-words">${log.memo?escapeHtml(log.memo):'<span style="color:var(--ink-soft)">（メモなし）</span>'}</p>
+          ${url?`<img src="${url}" class="press mt-2 w-20 h-20 object-cover rounded-xl photo-thumb cursor-pointer" data-url="${url}" alt="記録に添付された写真">`:''}
+        </div>
+        <div class="flex flex-col items-end shrink-0">
+          <span class="text-xs" style="color:var(--ink-soft)">${time}</span>
+          <button class="del-btn press text-[10px] font-bold mt-1" style="color:var(--error)" data-id="${log.id||''}">削除</button>
+        </div>
+      </div>`;
+    }
+
+    function bindRowButtons(container){
+      container.querySelectorAll('.del-btn').forEach(b=>b.addEventListener('click',()=>deleteLog(b.dataset.id)));
+      container.querySelectorAll('.photo-thumb').forEach(img=>img.addEventListener('click',()=>openImgModal(img.dataset.url)));
+    }
+
+    function openImgModal(url){
+      const m=document.getElementById('img-modal');
+      document.getElementById('modal-img').src=url;
+      m.classList.remove('hidden'); m.classList.add('flex');
+    }
+    function closeImgModal(){
+      const m=document.getElementById('img-modal');
+      m.classList.add('hidden'); m.classList.remove('flex');
+    }
+    document.getElementById('img-modal').addEventListener('click', closeImgModal);
+    document.getElementById('img-modal-close').addEventListener('click', (e)=>{ e.stopPropagation(); closeImgModal(); });
+    document.getElementById('modal-img').addEventListener('click', e=>e.stopPropagation());
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeImgModal(); });
+
+    // ===== カレンダー描画 =====
+    function renderCalendar() {
+      const year=calDate.getFullYear(), month=calDate.getMonth();
+      document.getElementById('cal-title').textContent=`${year}年 ${month+1}月`;
+
+      const byDay={};
+      allLogs.forEach(l=>{
+        const key=ymd(l.ts||l.date);
+        if(!byDay[key]) byDay[key]={types:new Set(),photo:false};
+        byDay[key].types.add(l.type);
+        if(l.photo) byDay[key].photo=true;
+      });
+
+      const first=new Date(year,month,1);
+      const startDay=first.getDay();
+      const daysInMonth=new Date(year,month+1,0).getDate();
+      const todayKey=ymd(new Date());
+
+      let cells='';
+      for(let i=0;i<startDay;i++) cells+='<div></div>';
+      for(let d=1;d<=daysInMonth;d++){
+        const dateObj=new Date(year,month,d);
+        const key=ymd(dateObj);
+        const info=byDay[key];
+        const isToday=key===todayKey;
+        const dow=dateObj.getDay();
+        const dowColor = dow===0?"color:var(--error)":dow===6?"color:var(--c-toilet)":"";
+        let dots='';
+        if(info){
+          if(info.types.has("ごはん")) dots+='<i class="dot-food inline-block w-1.5 h-1.5 rounded-full"></i>';
+          if(info.types.has("トイレ")) dots+='<i class="dot-toilet inline-block w-1.5 h-1.5 rounded-full"></i>';
+          if(info.types.has("体調・他")) dots+='<i class="dot-health inline-block w-1.5 h-1.5 rounded-full"></i>';
+          if(info.photo) dots+='<i class="dot-photo inline-block w-1.5 h-1.5 rounded-full"></i>';
         }
-        document.querySelectorAll('.type-btn').forEach(btn=>{
-            btn.addEventListener('click',()=>{ selectedType=btn.dataset.type; renderTypeButtons(); });
+        cells+=`
+        <button class="cal-cell press aspect-square rounded-xl flex flex-col items-center justify-start pt-1.5 gap-1"
+                style="${info?'background:var(--paper)':''} ${isToday?'box-shadow:inset 0 0 0 2px var(--ink)':''}"
+                data-date="${key}" aria-label="${month+1}月${d}日${info?'（記録あり）':''}">
+          <span class="text-[11px] font-bold" style="${dowColor}">${d}</span>
+          <span class="flex gap-0.5 flex-wrap justify-center px-0.5">${dots}</span>
+        </button>`;
+      }
+      document.getElementById('calendar-grid').innerHTML=cells;
+      document.querySelectorAll('.cal-cell').forEach(c=>c.addEventListener('click',()=>showDayDetail(c.dataset.date)));
+      document.getElementById('day-detail').classList.add('hidden');
+    }
+
+    function showDayDetail(dateKey){
+      const items=allLogs.filter(l=>ymd(l.ts||l.date)===dateKey).sort((a,b)=>new Date(a.ts||0)-new Date(b.ts||0));
+      const box=document.getElementById('day-detail');
+      const [y,m,d]=dateKey.split('-');
+      document.getElementById('day-detail-title').textContent=`${parseInt(m)}月${parseInt(d)}日 の記録`;
+      const listEl=document.getElementById('day-detail-list');
+      if(items.length===0){
+        listEl.innerHTML='<p class="text-xs text-center py-4" style="color:var(--ink-soft)">この日の記録はありません</p>';
+      } else {
+        listEl.innerHTML=`<div class="space-y-2">${items.map(log=>logRowHtml(log)).join('')}</div>`;
+        bindRowButtons(listEl);
+      }
+      box.classList.remove('hidden');
+      box.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }
+
+    document.getElementById('cal-prev').addEventListener('click',()=>{ calDate.setMonth(calDate.getMonth()-1); renderCalendar(); });
+    document.getElementById('cal-next').addEventListener('click',()=>{ calDate.setMonth(calDate.getMonth()+1); renderCalendar(); });
+
+    // ===== データ取得 =====
+    async function fetchLogs() {
+      isLoading=true; loadError=false; renderLogs();
+      try {
+        const res=await fetch(`${DATA_URL}?t=${Date.now()}`);
+        if(!res.ok) throw new Error('取得失敗');
+        const logs=await res.json();
+        allLogs=Array.isArray(logs)?logs:[];
+        isLoading=false;
+        renderLogs(); updateSummary();
+        if(!document.getElementById('tab-calendar').classList.contains('hidden')) renderCalendar();
+      } catch(err) {
+        allLogs=[]; isLoading=false; loadError=true;
+        renderLogs();
+      }
+    }
+
+    // ===== GitHub共通 =====
+    async function getFile(token){
+      const res=await fetch(API_URL,{headers:{'Authorization':`token ${token}`}});
+      if(!res.ok) throw new Error('認証エラーまたはファイル取得失敗');
+      const json=await res.json();
+      let logs=[];
+      try{ logs=JSON.parse(decodeURIComponent(escape(atob(json.content)))); }catch(e){}
+      return {logs:Array.isArray(logs)?logs:[], sha:json.sha};
+    }
+    async function putFile(token,logs,sha,message){
+      const res=await fetch(API_URL,{
+        method:'PUT',
+        headers:{'Authorization':`token ${token}`,'Content-Type':'application/json'},
+        body:JSON.stringify({message,content:btoa(unescape(encodeURIComponent(JSON.stringify(logs,null,2)))),sha})
+      });
+      if(!res.ok) throw new Error('保存に失敗しました');
+    }
+    async function uploadImage(token, dataUrl){
+      const base64=dataUrl.split(',')[1];
+      const filename=`${Date.now()}-${Math.random().toString(36).slice(2,6)}.jpg`;
+      const res=await fetch(`${IMG_API}/${filename}`,{
+        method:'PUT',
+        headers:{'Authorization':`token ${token}`,'Content-Type':'application/json'},
+        body:JSON.stringify({message:'Add cat photo',content:base64})
+      });
+      if(!res.ok) throw new Error('写真のアップロードに失敗しました');
+      return filename;
+    }
+    async function deleteImage(token, filename){
+      try{
+        const infoRes=await fetch(`${IMG_API}/${filename}`,{headers:{'Authorization':`token ${token}`}});
+        if(!infoRes.ok) return;
+        const info=await infoRes.json();
+        await fetch(`${IMG_API}/${filename}`,{
+          method:'DELETE',
+          headers:{'Authorization':`token ${token}`,'Content-Type':'application/json'},
+          body:JSON.stringify({message:'Delete cat photo',sha:info.sha})
         });
+      }catch(e){}
+    }
 
-        // ===== クイックメモ =====
-        function renderQuickMemos() {
-            const wrap = document.getElementById('quick-memo');
-            wrap.innerHTML = (QUICK_MEMOS[selectedType]||[]).map(m=>
-                `<button type="button" class="qmemo px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs active:scale-95 transition">+ ${m}</button>`
-            ).join('');
-            wrap.querySelectorAll('.qmemo').forEach(b=>{
-                b.addEventListener('click',()=>{
-                    const input=document.getElementById('memo');
-                    const text=b.textContent.replace('+ ','');
-                    input.value = input.value?`${input.value} / ${text}`:text;
-                });
-            });
-        }
+    // ===== 保存 =====
+    document.getElementById('save-btn').addEventListener('click', async ()=>{
+      const token=tokenInput.value.trim();
+      const memo=document.getElementById('memo').value.trim();
+      const dtVal=document.getElementById('datetime').value;
+      const saveBtn=document.getElementById('save-btn');
+      if(!token){ showToast('GitHubトークンを設定してください','error'); return; }
 
-        // ===== フィルター =====
-        function renderFilterButtons() {
-            document.querySelectorAll('.filter-btn').forEach(btn=>{
-                const active=btn.dataset.filter===currentFilter;
-                btn.className="filter-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold " +
-                    (active?"bg-indigo-600 text-white":"bg-gray-100 text-gray-500");
-            });
+      saveBtn.disabled=true; saveBtn.textContent='保存中...';
+      try {
+        let photoName=null;
+        if(selectedPhotoData){
+          saveBtn.textContent='写真をアップ中...';
+          photoName=await uploadImage(token, selectedPhotoData);
         }
-        document.querySelectorAll('.filter-btn').forEach(btn=>{
-            btn.addEventListener('click',()=>{ currentFilter=btn.dataset.filter; renderFilterButtons(); renderLogs(); });
+        saveBtn.textContent='保存中...';
+        const {logs,sha}=await getFile(token);
+        const dateObj=dtVal?new Date(dtVal):new Date();
+        logs.push({
+          id:`${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+          type:selectedType,
+          memo:memo,
+          ts:dateObj.toISOString(),
+          date:`${dateObj.getMonth()+1}/${dateObj.getDate()} ${String(dateObj.getHours()).padStart(2,'0')}:${String(dateObj.getMinutes()).padStart(2,'0')}`,
+          photo:photoName
         });
-
-        // ===== トークン =====
-        const tokenInput=document.getElementById('token');
-        const savedToken=localStorage.getItem('github_token');
-        if(savedToken) tokenInput.value=savedToken;
-        function updateTokenStatus() {
-            const el=document.getElementById('token-status');
-            if(tokenInput.value.trim()){ el.textContent="設定済み"; el.className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-600"; }
-            else { el.textContent="未設定"; el.className="text-[10px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-500"; }
-        }
-        tokenInput.addEventListener('input',e=>{ localStorage.setItem('github_token',e.target.value); updateTokenStatus(); });
-
-        // ===== 写真：選択→圧縮 =====
-        document.getElementById('photo').addEventListener('change', async (e)=>{
-            const file=e.target.files[0];
-            if(!file) return;
-            try {
-                selectedPhotoData = await compressImage(file, 1000, 0.75);
-                document.getElementById('preview-img').src = selectedPhotoData;
-                document.getElementById('photo-preview').classList.remove('hidden');
-            } catch(err) {
-                showToast('画像の読み込みに失敗しました','error');
-            }
-        });
-        document.getElementById('photo-clear').addEventListener('click', clearPhoto);
-        function clearPhoto() {
-            selectedPhotoData=null;
-            document.getElementById('photo').value='';
-            document.getElementById('photo-preview').classList.add('hidden');
-        }
-        function compressImage(file, maxW, quality) {
-            return new Promise((resolve,reject)=>{
-                const reader=new FileReader();
-                reader.onload=()=>{
-                    const img=new Image();
-                    img.onload=()=>{
-                        let {width,height}=img;
-                        if(width>maxW){ height=Math.round(height*maxW/width); width=maxW; }
-                        const canvas=document.createElement('canvas');
-                        canvas.width=width; canvas.height=height;
-                        canvas.getContext('2d').drawImage(img,0,0,width,height);
-                        resolve(canvas.toDataURL('image/jpeg',quality));
-                    };
-                    img.onerror=reject;
-                    img.src=reader.result;
-                };
-                reader.onerror=reject;
-                reader.readAsDataURL(file);
-            });
-        }
-
-        // ===== 日付ユーティリティ =====
-        function ymd(d){ const x=new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; }
-        function timeLabel(iso){ const d=new Date(iso); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
-        function dayLabel(d){
-            const today=new Date(); today.setHours(0,0,0,0);
-            const t=new Date(d); t.setHours(0,0,0,0);
-            const diff=Math.round((today-t)/86400000);
-            if(diff===0) return "今日";
-            if(diff===1) return "昨日";
-            return `${t.getMonth()+1}月${t.getDate()}日`;
-        }
-        function toDatetimeLocal(d){
-            const p=n=>String(n).padStart(2,'0');
-            return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-        }
-
-        // ===== サマリー =====
-        function updateSummary() {
-            const today=ymd(new Date());
-            const counts={"ごはん":0,"トイレ":0,"体調・他":0};
-            allLogs.forEach(l=>{ if(ymd(l.ts||l.date)===today && counts[l.type]!==undefined) counts[l.type]++; });
-            document.getElementById('sum-food').textContent=counts["ごはん"];
-            document.getElementById('sum-toilet').textContent=counts["トイレ"];
-            document.getElementById('sum-other').textContent=counts["体調・他"];
-            const now=new Date();
-            document.getElementById('today-date').textContent=`${now.getMonth()+1}/${now.getDate()} (${'日月火水木金土'[now.getDay()]})`;
-        }
-
-        function escapeHtml(str){ return String(str).replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
-
-        function photoUrl(log){
-            if(!log.photo) return null;
-            return `${IMG_RAW_DIR}/${log.photo}`;
-        }
-
-        // ===== リスト描画 =====
-        function renderLogs() {
-            const listEl=document.getElementById('log-list');
-            let logs=[...allLogs];
-            if(currentFilter!=="all") logs=logs.filter(l=>l.type===currentFilter);
-            logs.sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
-            if(logs.length===0){ listEl.innerHTML='<p class="text-xs text-gray-400 text-center py-6">📭 記録がありません</p>'; return; }
-
-            const groups={};
-            logs.forEach(l=>{ const key=l.ts?dayLabel(l.ts):(l.date||"日付不明"); (groups[key]=groups[key]||[]).push(l); });
-
-            listEl.innerHTML=Object.entries(groups).map(([label,items])=>`
-                <div>
-                    <div class="py-1 mb-1"><span class="text-xs font-bold text-gray-400">${label}</span></div>
-                    <div class="divide-y divide-gray-100">
-                        ${items.map(log=>logRowHtml(log)).join('')}
-                    </div>
-                </div>`).join('');
-            bindRowButtons(listEl);
-        }
-
-        function logRowHtml(log){
-            const st=TYPE_STYLE[log.type]||{badge:"bg-gray-100 text-gray-600",icon:"📝"};
-            const time=log.ts?timeLabel(log.ts):(log.date||"");
-            const url=photoUrl(log);
-            return `
-            <div class="py-3 flex justify-between items-start gap-2">
-                <div class="flex-1 min-w-0">
-                    <span class="inline-block px-2 py-0.5 text-xs font-bold rounded-md ${st.badge}">${st.icon} ${log.type}</span>
-                    <p class="text-sm mt-1 text-gray-800 break-words">${log.memo?escapeHtml(log.memo):'<span class="text-gray-400">（メモなし）</span>'}</p>
-                    ${url?`<img src="${url}" class="mt-2 w-24 h-24 object-cover rounded-xl border cursor-pointer photo-thumb" data-url="${url}" alt="写真">`:''}
-                </div>
-                <div class="flex flex-col items-end shrink-0">
-                    <span class="text-xs text-gray-400">${time}</span>
-                    <button class="del-btn text-[10px] text-red-400 mt-1 active:opacity-60" data-id="${log.id||''}">削除</button>
-                </div>
-            </div>`;
-        }
-
-        function bindRowButtons(container){
-            container.querySelectorAll('.del-btn').forEach(b=>b.addEventListener('click',()=>deleteLog(b.dataset.id)));
-            container.querySelectorAll('.photo-thumb').forEach(img=>img.addEventListener('click',()=>openImgModal(img.dataset.url)));
-        }
-
-        function openImgModal(url){
-            const m=document.getElementById('img-modal');
-            document.getElementById('modal-img').src=url;
-            m.classList.remove('hidden'); m.classList.add('flex');
-        }
-        function closeImgModal(){
-            const m=document.getElementById('img-modal');
-            m.classList.add('hidden'); m.classList.remove('flex');
-        }
-
-        // ===== カレンダー描画 =====
-        function renderCalendar() {
-            const year=calDate.getFullYear(), month=calDate.getMonth();
-            document.getElementById('cal-title').textContent=`${year}年 ${month+1}月`;
-
-            const byDay={};
-            allLogs.forEach(l=>{
-                const key=ymd(l.ts||l.date);
-                if(!byDay[key]) byDay[key]={types:new Set(),photo:false};
-                byDay[key].types.add(l.type);
-                if(l.photo) byDay[key].photo=true;
-            });
-
-            const first=new Date(year,month,1);
-            const startDay=first.getDay();
-            const daysInMonth=new Date(year,month+1,0).getDate();
-            const todayKey=ymd(new Date());
-
-            let cells='';
-            for(let i=0;i<startDay;i++) cells+='<div></div>';
-            for(let d=1;d<=daysInMonth;d++){
-                const dateObj=new Date(year,month,d);
-                const key=ymd(dateObj);
-                const info=byDay[key];
-                const isToday=key===todayKey;
-                const dow=dateObj.getDay();
-                const dowColor=dow===0?"text-red-400":dow===6?"text-blue-400":"text-gray-700";
-                let icons='';
-                if(info){
-                    if(info.types.has("ごはん")) icons+='🍚';
-                    if(info.types.has("トイレ")) icons+='🚽';
-                    if(info.types.has("体調・他")) icons+='🩺';
-                    if(info.photo) icons+='📷';
-                }
-                cells+=`
-                <button class="cal-cell aspect-square rounded-lg flex flex-col items-center justify-start pt-1 border ${info?'border-indigo-100 bg-indigo-50/40':'border-transparent'} ${isToday?'ring-2 ring-indigo-400':''} active:opacity-70"
-                        data-date="${key}">
-                    <span class="text-[11px] font-bold ${dowColor}">${d}</span>
-                    <span class="text-[9px] leading-tight break-all">${icons}</span>
-                </button>`;
-            }
-            document.getElementById('calendar-grid').innerHTML=cells;
-            document.querySelectorAll('.cal-cell').forEach(c=>c.addEventListener('click',()=>showDayDetail(c.dataset.date)));
-            document.getElementById('day-detail').classList.add('hidden');
-        }
-
-        function showDayDetail(dateKey){
-            const items=allLogs.filter(l=>ymd(l.ts||l.date)===dateKey).sort((a,b)=>new Date(a.ts||0)-new Date(b.ts||0));
-            const box=document.getElementById('day-detail');
-            const [y,m,d]=dateKey.split('-');
-            document.getElementById('day-detail-title').textContent=`${parseInt(m)}月${parseInt(d)}日 の記録`;
-            const listEl=document.getElementById('day-detail-list');
-            if(items.length===0){
-                listEl.innerHTML='<p class="text-xs text-gray-400 text-center py-4">この日の記録はありません</p>';
-            } else {
-                listEl.innerHTML=`<div class="divide-y divide-gray-100">${items.map(log=>logRowHtml(log)).join('')}</div>`;
-                bindRowButtons(listEl);
-            }
-            box.classList.remove('hidden');
-            box.scrollIntoView({behavior:'smooth',block:'nearest'});
-        }
-
-        document.getElementById('cal-prev').addEventListener('click',()=>{ calDate.setMonth(calDate.getMonth()-1); renderCalendar(); });
-        document.getElementById('cal-next').addEventListener('click',()=>{ calDate.setMonth(calDate.getMonth()+1); renderCalendar(); });
-
-        // ===== データ取得 =====
-        async function fetchLogs() {
-            const listEl=document.getElementById('log-list');
-            try {
-                const res=await fetch(`${DATA_URL}?t=${Date.now()}`);
-                if(!res.ok) throw new Error('取得失敗');
-                const logs=await res.json();
-                allLogs=Array.isArray(logs)?logs:[];
-                renderLogs(); updateSummary();
-                if(!document.getElementById('tab-calendar').classList.contains('hidden')) renderCalendar();
-            } catch(err) {
-                allLogs=[];
-                listEl.innerHTML='<p class="text-xs text-red-400 text-center py-4">データの読み込みに失敗しました</p>';
-            }
-        }
-
-        // ===== GitHub共通 =====
-        async function getFile(token){
-            const res=await fetch(API_URL,{headers:{'Authorization':`token ${token}`}});
-            if(!res.ok) throw new Error('認証エラーまたはファイル取得失敗');
-            const json=await res.json();
-            let logs=[];
-            try{ logs=JSON.parse(decodeURIComponent(escape(atob(json.content)))); }catch(e){}
-            return {logs:Array.isArray(logs)?logs:[], sha:json.sha};
-        }
-        async function putFile(token,logs,sha,message){
-            const res=await fetch(API_URL,{
-                method:'PUT',
-                headers:{'Authorization':`token ${token}`,'Content-Type':'application/json'},
-                body:JSON.stringify({message,content:btoa(unescape(encodeURIComponent(JSON.stringify(logs,null,2)))),sha})
-            });
-            if(!res.ok) throw new Error('保存に失敗しました');
-        }
-        async function uploadImage(token, dataUrl){
-            const base64=dataUrl.split(',')[1];
-            const filename=`${Date.now()}-${Math.random().toString(36).slice(2,6)}.jpg`;
-            const res=await fetch(`${IMG_API}/${filename}`,{
-                method:'PUT',
-                headers:{'Authorization':`token ${token}`,'Content-Type':'application/json'},
-                body:JSON.stringify({message:'Add cat photo',content:base64})
-            });
-            if(!res.ok) throw new Error('写真のアップロードに失敗しました');
-            return filename;
-        }
-        async function deleteImage(token, filename){
-            try{
-                const infoRes=await fetch(`${IMG_API}/${filename}`,{headers:{'Authorization':`token ${token}`}});
-                if(!infoRes.ok) return;
-                const info=await infoRes.json();
-                await fetch(`${IMG_API}/${filename}`,{
-                    method:'DELETE',
-                    headers:{'Authorization':`token ${token}`,'Content-Type':'application/json'},
-                    body:JSON.stringify({message:'Delete cat photo',sha:info.sha})
-                });
-            }catch(e){}
-        }
-
-        // ===== 保存 =====
-        document.getElementById('save-btn').addEventListener('click', async ()=>{
-            const token=tokenInput.value.trim();
-            const memo=document.getElementById('memo').value.trim();
-            const dtVal=document.getElementById('datetime').value;
-            const saveBtn=document.getElementById('save-btn');
-            if(!token){ showToast('トークンを設定してください','error'); return; }
-
-            saveBtn.disabled=true; saveBtn.textContent='保存中...';
-            try {
-                let photoName=null;
-                if(selectedPhotoData){
-                    saveBtn.textContent='写真をアップ中...';
-                    photoName=await uploadImage(token, selectedPhotoData);
-                }
-                saveBtn.textContent='保存中...';
-                const {logs,sha}=await getFile(token);
-                const dateObj=dtVal?new Date(dtVal):new Date();
-                logs.push({
-                    id:`${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
-                    type:selectedType,
-                    memo:memo,
-                    ts:dateObj.toISOString(),
-                    date:`${dateObj.getMonth()+1}/${dateObj.getDate()} ${String(dateObj.getHours()).padStart(2,'0')}:${String(dateObj.getMinutes()).padStart(2,'0')}`,
-                    photo:photoName
-                });
-                await putFile(token,logs,sha,'Add cat health log');
-                document.getElementById('memo').value='';
-                clearPhoto();
-                document.getElementById('datetime').value=toDatetimeLocal(new Date());
-                showToast('記録を保存しました！','success');
-                // GitHub Pagesの反映を少し待ってから再取得
-                setTimeout(fetchLogs, 2000);
-            } catch(err) {
-                showToast('エラー: '+err.message,'error');
-            } finally {
-                saveBtn.disabled=false; saveBtn.textContent='記録を保存する';
-            }
-        });
-
-        // ===== 削除 =====
-        async function deleteLog(id){
-            if(!id){ showToast('この記録は削除できません（旧データ）','error'); return; }
-            if(!confirm('この記録を削除しますか？')) return;
-            const token=tokenInput.value.trim();
-            if(!token){ showToast('トークンを設定してください','error'); return; }
-            try {
-                const {logs,sha}=await getFile(token);
-                const target=logs.find(l=>l.id===id);
-                const newLogs=logs.filter(l=>l.id!==id);
-                await putFile(token,newLogs,sha,'Delete cat health log');
-                if(target&&target.photo) await deleteImage(token,target.photo);
-                showToast('削除しました','success');
-                setTimeout(fetchLogs, 2000);
-            } catch(err) {
-                showToast('エラー: '+err.message,'error');
-            }
-        }
-
-        document.getElementById('refresh-btn').addEventListener('click',fetchLogs);
-
-        // ===== 初期化 =====
+        await putFile(token,logs,sha,'Add cat health log');
+        document.getElementById('memo').value='';
+        clearPhoto();
         document.getElementById('datetime').value=toDatetimeLocal(new Date());
-        updateTokenStatus();
-        renderTypeButtons();
-        renderFilterButtons();
-        switchTab('input');
-        fetchLogs();
-    </script>
+        showToast('記録を保存しました', 'success');
+        setTimeout(fetchLogs, 2000);
+      } catch(err) {
+        showToast('エラー: '+err.message,'error');
+      } finally {
+        saveBtn.disabled=false; saveBtn.textContent='記録を保存する';
+      }
+    });
+
+    // ===== 削除 =====
+    async function deleteLog(id){
+      if(!id){ showToast('この記録は削除できません（旧データ）','error'); return; }
+      const ok = await askConfirm('この記録を削除しますか？\nこの操作は取り消せません。');
+      if(!ok) return;
+      const token=tokenInput.value.trim();
+      if(!token){ showToast('GitHubトークンを設定してください','error'); return; }
+      try {
+        const {logs,sha}=await getFile(token);
+        const target=logs.find(l=>l.id===id);
+        const newLogs=logs.filter(l=>l.id!==id);
+        await putFile(token,newLogs,sha,'Delete cat health log');
+        if(target&&target.photo) await deleteImage(token,target.photo);
+        showToast('削除しました','success');
+        setTimeout(fetchLogs, 2000);
+      } catch(err) {
+        showToast('エラー: '+err.message,'error');
+      }
+    }
+
+    document.getElementById('refresh-btn').addEventListener('click',fetchLogs);
+
+    // ===== 初期化 =====
+    document.getElementById('datetime').value=toDatetimeLocal(new Date());
+    updateTokenStatus();
+    renderTypeButtons();
+    renderFilterButtons();
+    switchTab('input');
+    fetchLogs();
+  </script>
 </body>
 </html>
