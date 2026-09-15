@@ -17,9 +17,8 @@
         <div class="bg-white p-5 rounded-2xl shadow-sm space-y-4">
             <h2 class="font-bold text-sm text-gray-700">いまの記録を追加</h2>
             
-            <!-- GitHubトークン設定（スマホでも使えるように一時保持） -->
             <div>
-                <label class="block text-xs font-medium text-gray-500 mb-1">GitHub パソコントークン (PAT)</label>
+                <label class="block text-xs font-medium text-gray-500 mb-1">GitHub アクセストークン (PAT)</label>
                 <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxx" class="w-full p-2.5 text-sm border rounded-xl bg-gray-50">
                 <p class="text-[10px] text-gray-400 mt-1">※初回のみ入力。ブラウザに保存されます。</p>
             </div>
@@ -53,10 +52,9 @@
     </div>
 
     <script>
-        const REPO = "yoshikis0207-maker/cat-health-log"; // あなたのリポジトリ
+        const REPO = "yoshikis0207-maker/cat-health-log";
         let selectedType = "ごはん";
 
-        // 種類の選択ボタンの切り替え
         document.querySelectorAll('.type-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.type-btn').forEach(b => {
@@ -70,7 +68,6 @@
             });
         });
 
-        // トークンの保存復元
         const tokenInput = document.getElementById('token');
         const savedToken = localStorage.getItem('github_token');
         if (savedToken) tokenInput.value = savedToken;
@@ -78,20 +75,19 @@
             localStorage.setItem('github_token', e.target.value);
         });
 
-        // データの読み込み
         async function fetchLogs() {
             try {
                 const res = await fetch(`https://raw.githubusercontent.com/${REPO}/main/data.json?t=${new Date().getTime()}`);
                 const logs = await res.json();
                 const listEl = document.getElementById('log-list');
                 
-                if (logs.length === 0) {
+                if (!logs || logs.length === 0) {
                     listEl.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">まだ記録がありません</p>';
                     return;
                 }
 
                 listEl.innerHTML = logs.reverse().map(log => `
-                    py-3 first:pt-0 last:pb-0 flex justify-between items-center">
+                    <div class="py-3 first:pt-0 last:pb-0 flex justify-between items-center">
                         <div>
                             <span class="inline-block px-2 py-0.5 text-xs font-bold rounded-md ${log.type === 'ごはん' ? 'bg-orange-100 text-orange-700' : log.type === 'トイレ' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${log.type}</span>
                             <p class="text-sm mt-1 text-gray-800">${log.memo || '（メモなし）'}</p>
@@ -104,7 +100,6 @@
             }
         }
 
-        // データの保存
         document.getElementById('save-btn').addEventListener('click', async () => {
             const token = tokenInput.value.trim();
             const memo = document.getElementById('memo').value.trim();
@@ -119,7 +114,6 @@
             saveBtn.textContent = '保存中...';
 
             try {
-                // 1. 現在の data.json と sha を取得
                 const fileRes = await fetch(`https://api.github.com/repos/${REPO}/contents/data.json`, {
                     headers: { 'Authorization': `token ${token}` }
                 });
@@ -131,7 +125,6 @@
                     currentLogs = JSON.parse(atob(fileJson.content));
                 } catch(e) {}
 
-                // 2. 新しいデータを追加
                 const now = new Date();
                 const dateStr = `${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
                 
@@ -141,9 +134,9 @@
                     date: dateStr
                 });
 
-                // 3. GitHubへ書き込み
                 const updateRes = await fetch(`https://api.github.com/repos/${REPO}/contents/data.json`, {
                     method: 'PUT',
+                    headers: {
                         'Authorization': `token ${token}`,
                         'Content-Type': 'application/json',
                     },
@@ -168,7 +161,6 @@
             }
         });
 
-        // 初期読み込み
         fetchLogs();
     </script>
 </body>
