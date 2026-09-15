@@ -4,14 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>猫の体調管理ログ</title>
-    <!-- ▼ URLはご自身で確認・修正してください -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .toast { transition: transform .3s ease, opacity .3s ease; }
         .toast.hidden-toast { transform: translateY(20px); opacity: 0; pointer-events: none; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        /* モーダル */
         .modal-bg { transition: opacity .2s ease; }
     </style>
 </head>
@@ -159,17 +157,17 @@
 
     <script>
         const REPO = "yoshikis0207-maker/cat-health-log";
-        // ▼ URLはご自身で確認・修正してください
-        const RAW_URL     = `https://raw.githubusercontent.com/${REPO}/main/data.json`;
-        const API_URL     = `https://api.github.com/repos/${REPO}/contents/data.json`;
-        const IMG_API     = `https://api.github.com/repos/${REPO}/contents/images`;
+        // データの読み込みをGitHub Pagesの相対パスに変更（キャッシュ対策付き）
+        const DATA_URL  = `./data.json`;
+        const API_URL   = `https://api.github.com/repos/${REPO}/contents/data.json`;
+        const IMG_API   = `https://api.github.com/repos/${REPO}/contents/images`;
         const IMG_RAW_DIR = `https://raw.githubusercontent.com/${REPO}/main/images`;
 
         let selectedType = "ごはん";
         let currentFilter = "all";
         let allLogs = [];
-        let calDate = new Date();      // カレンダー表示中の月
-        let selectedPhotoData = null;  // 圧縮済みBase64（dataURL）
+        let calDate = new Date();      
+        let selectedPhotoData = null;  
 
         const TYPE_STYLE = {
             "ごはん":  { badge: "bg-orange-100 text-orange-700", icon: "🍚" },
@@ -276,7 +274,6 @@
             document.getElementById('photo').value='';
             document.getElementById('photo-preview').classList.add('hidden');
         }
-        // Canvasでリサイズ＆JPEG圧縮
         function compressImage(file, maxW, quality) {
             return new Promise((resolve,reject)=>{
                 const reader=new FileReader();
@@ -328,10 +325,8 @@
 
         function escapeHtml(str){ return String(str).replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
 
-        // ===== 画像URL解決 =====
         function photoUrl(log){
             if(!log.photo) return null;
-            // photoにはファイル名だけを保存（例: 169xxxx.jpg）
             return `${IMG_RAW_DIR}/${log.photo}`;
         }
 
@@ -379,7 +374,6 @@
             container.querySelectorAll('.photo-thumb').forEach(img=>img.addEventListener('click',()=>openImgModal(img.dataset.url)));
         }
 
-        // ===== 画像モーダル =====
         function openImgModal(url){
             const m=document.getElementById('img-modal');
             document.getElementById('modal-img').src=url;
@@ -395,7 +389,6 @@
             const year=calDate.getFullYear(), month=calDate.getMonth();
             document.getElementById('cal-title').textContent=`${year}年 ${month+1}月`;
 
-            // 日別に集計
             const byDay={};
             allLogs.forEach(l=>{
                 const key=ymd(l.ts||l.date);
@@ -434,14 +427,11 @@
             }
             document.getElementById('calendar-grid').innerHTML=cells;
             document.querySelectorAll('.cal-cell').forEach(c=>c.addEventListener('click',()=>showDayDetail(c.dataset.date)));
-
-            // 詳細エリアは月切替時に閉じる
             document.getElementById('day-detail').classList.add('hidden');
         }
 
         function showDayDetail(dateKey){
-            const items=allLogs.filter(l=>ymd(l.ts||l.date)===dateKey)
-                               .sort((a,b)=>new Date(a.ts||0)-new Date(b.ts||0));
+            const items=allLogs.filter(l=>ymd(l.ts||l.date)===dateKey).sort((a,b)=>new Date(a.ts||0)-new Date(b.ts||0));
             const box=document.getElementById('day-detail');
             const [y,m,d]=dateKey.split('-');
             document.getElementById('day-detail-title').textContent=`${parseInt(m)}月${parseInt(d)}日 の記録`;
@@ -463,7 +453,7 @@
         async function fetchLogs() {
             const listEl=document.getElementById('log-list');
             try {
-                const res=await fetch(`${RAW_URL}?t=${Date.now()}`);
+                const res=await fetch(`${DATA_URL}?t=${Date.now()}`);
                 if(!res.ok) throw new Error('取得失敗');
                 const logs=await res.json();
                 allLogs=Array.isArray(logs)?logs:[];
@@ -492,7 +482,6 @@
             });
             if(!res.ok) throw new Error('保存に失敗しました');
         }
-        // 画像アップロード（新規作成）→ ファイル名を返す
         async function uploadImage(token, dataUrl){
             const base64=dataUrl.split(',')[1];
             const filename=`${Date.now()}-${Math.random().toString(36).slice(2,6)}.jpg`;
@@ -504,7 +493,6 @@
             if(!res.ok) throw new Error('写真のアップロードに失敗しました');
             return filename;
         }
-        // 画像削除
         async function deleteImage(token, filename){
             try{
                 const infoRes=await fetch(`${IMG_API}/${filename}`,{headers:{'Authorization':`token ${token}`}});
@@ -515,7 +503,7 @@
                     headers:{'Authorization':`token ${token}`,'Content-Type':'application/json'},
                     body:JSON.stringify({message:'Delete cat photo',sha:info.sha})
                 });
-            }catch(e){ /* 画像削除失敗は致命的でないので無視 */ }
+            }catch(e){}
         }
 
         // ===== 保存 =====
@@ -528,7 +516,6 @@
 
             saveBtn.disabled=true; saveBtn.textContent='保存中...';
             try {
-                // 写真があれば先にアップロード
                 let photoName=null;
                 if(selectedPhotoData){
                     saveBtn.textContent='写真をアップ中...';
@@ -550,7 +537,8 @@
                 clearPhoto();
                 document.getElementById('datetime').value=toDatetimeLocal(new Date());
                 showToast('記録を保存しました！','success');
-                fetchLogs();
+                // GitHub Pagesの反映を少し待ってから再取得
+                setTimeout(fetchLogs, 2000);
             } catch(err) {
                 showToast('エラー: '+err.message,'error');
             } finally {
@@ -571,13 +559,12 @@
                 await putFile(token,newLogs,sha,'Delete cat health log');
                 if(target&&target.photo) await deleteImage(token,target.photo);
                 showToast('削除しました','success');
-                fetchLogs();
+                setTimeout(fetchLogs, 2000);
             } catch(err) {
                 showToast('エラー: '+err.message,'error');
             }
         }
 
-        // ===== 更新ボタン =====
         document.getElementById('refresh-btn').addEventListener('click',fetchLogs);
 
         // ===== 初期化 =====
